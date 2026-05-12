@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Harbour Album | Hong Kong Stamp Trail</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIINfQXa8n2nuA1PrD7b1LkKmEYYvbnoQ2I="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Hong Kong Stamp Trail</p>
+          <h1>Harbour Album</h1>
+          <p class="hero-text">
+            Track the free stamps you collect around Hong Kong, pin each stop on
+            the map, and keep a photo memory of every stamp.
+          </p>
+          <div class="hero-actions">
+            <button id="seed-button" class="button button-secondary" type="button">
+              Load Example Trail
+            </button>
+            <button id="export-button" class="button button-primary" type="button">
+              Export Trail
+            </button>
+            <label class="button button-ghost" for="import-file">Import JSON</label>
+            <input id="import-file" type="file" accept="application/json" hidden />
+          </div>
+        </div>
+        <div class="hero-panel">
+          <div class="panel-badge">Trail Snapshot</div>
+          <div id="headline-stat" class="headline-stat">0 stamps collected</div>
+          <p id="headline-note" class="panel-note">
+            Add your first stop and pin it on the Hong Kong map.
+          </p>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="card card-form">
+          <div class="section-title">
+            <div>
+              <p class="section-kicker">New Stop</p>
+              <h2 id="form-title">Add A Stamp</h2>
+            </div>
+            <button id="reset-button" class="text-button" type="button">Clear Form</button>
+          </div>
+
+          <form id="stamp-form" class="stamp-form">
+            <input id="stamp-id" type="hidden" />
+            <input id="latitude" type="hidden" />
+            <input id="longitude" type="hidden" />
+
+            <label>
+              <span>Stamp Name</span>
+              <input id="name" name="name" type="text" placeholder="Tai Kwun heritage stamp" required />
+            </label>
+
+            <div class="form-grid">
+              <label>
+                <span>Place</span>
+                <input id="place" name="place" type="text" placeholder="Tai Kwun, Central" required />
+              </label>
+              <label>
+                <span>District</span>
+                <select id="district" name="district" required>
+                  <option value="">Choose one</option>
+                  <option>Central and Western</option>
+                  <option>Wan Chai</option>
+                  <option>Eastern</option>
+                  <option>Southern</option>
+                  <option>Yau Tsim Mong</option>
+                  <option>Sham Shui Po</option>
+                  <option>Kowloon City</option>
+                  <option>Wong Tai Sin</option>
+                  <option>Kwun Tong</option>
+                  <option>Tsuen Wan</option>
+                  <option>Tuen Mun</option>
+                  <option>Yuen Long</option>
+                  <option>North</option>
+                  <option>Tai Po</option>
+                  <option>Sha Tin</option>
+                  <option>Sai Kung</option>
+                  <option>Islands</option>
+                  <option>Kwai Tsing</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="form-grid">
+              <label>
+                <span>Date Collected</span>
+                <input id="collectedDate" name="collectedDate" type="date" required />
+              </label>
+              <label>
+                <span>Stamp Type</span>
+                <select id="stampType" name="stampType">
+                  <option>Shop stamp</option>
+                  <option>Museum stamp</option>
+                  <option>MTR / transport stamp</option>
+                  <option>Event stamp</option>
+                  <option>Temple stamp</option>
+                  <option>Tourist checkpoint</option>
+                  <option>Other</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              <span>Stamp Photo</span>
+              <input id="photo" name="photo" type="file" accept="image/*" />
+            </label>
+            <div id="photo-preview" class="photo-preview empty-photo">
+              <span>No photo selected</span>
+            </div>
+
+            <label>
+              <span>Notes</span>
+              <textarea id="notes" name="notes" rows="4" placeholder="Opening hours, where the stamp is kept, ink colour, nearby stops..."></textarea>
+            </label>
+
+            <div class="map-field">
+              <div class="field-heading">
+                <span>Pick Place On Map</span>
+                <button id="locate-button" class="text-button" type="button">Use My Location</button>
+              </div>
+              <div id="picker-map" class="map picker-map"></div>
+              <p id="coordinate-label" class="coordinate-label">Click the map to drop a pin.</p>
+            </div>
+
+            <div class="form-actions">
+              <button class="button button-primary" type="submit">Save Stamp</button>
+              <button id="delete-button" class="button button-danger hidden" type="button">Delete Current Entry</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="workspace">
+          <div class="stats-grid" id="stats-grid"></div>
+
+          <section class="card map-card">
+            <div class="section-title">
+              <div>
+                <p class="section-kicker">Stamps Collected</p>
+                <h2>Hong Kong Map</h2>
+              </div>
+            </div>
+            <div id="collection-map" class="map collection-map"></div>
+          </section>
+
+          <section class="card filters-card">
+            <div class="section-title">
+              <div>
+                <p class="section-kicker">Directory</p>
+                <h2>Find A Stop</h2>
+              </div>
+            </div>
+
+            <div class="filters">
+              <label>
+                <span>Search</span>
+                <input id="search" type="search" placeholder="Search stamp, place, district, notes..." />
+              </label>
+              <label>
+                <span>District</span>
+                <select id="filter-district">
+                  <option value="all">All districts</option>
+                </select>
+              </label>
+              <label>
+                <span>Type</span>
+                <select id="filter-type">
+                  <option value="all">All types</option>
+                  <option>Shop stamp</option>
+                  <option>Museum stamp</option>
+                  <option>MTR / transport stamp</option>
+                  <option>Event stamp</option>
+                  <option>Temple stamp</option>
+                  <option>Tourist checkpoint</option>
+                  <option>Other</option>
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section class="card collection-card">
+            <div class="section-title">
+              <div>
+                <p class="section-kicker">Collected Stops</p>
+                <h2>Your Stamp Trail</h2>
+              </div>
+            </div>
+            <div id="collection-list" class="collection-list"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <template id="stamp-card-template">
+      <article class="stamp-card">
+        <div class="stamp-thumb"></div>
+        <div class="stamp-card-body">
+          <div class="stamp-card-top">
+            <div>
+              <p class="stamp-place"></p>
+              <h3 class="stamp-name"></h3>
+            </div>
+            <span class="stamp-type"></span>
+          </div>
+          <div class="stamp-meta"></div>
+          <p class="stamp-notes"></p>
+          <div class="stamp-footer">
+            <span class="stamp-date"></span>
+            <button class="button button-secondary stamp-edit" type="button">Edit</button>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
