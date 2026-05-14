@@ -3,18 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Harbour Album | Hong Kong Stamp Trail</title>
+    <title>Harbour Album | Hong Kong Stamp Journal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIINfQXa8n2nuA1PrD7b1LkKmEYYvbnoQ2I="
-      crossorigin=""
     />
     <link rel="stylesheet" href="./styles.css" />
   </head>
@@ -22,28 +16,29 @@
     <div class="page-shell">
       <header class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">Hong Kong Stamp Trail</p>
+          <p class="eyebrow">Hong Kong Stamp Journal</p>
           <h1>Harbour Album</h1>
           <p class="hero-text">
-            Track the free stamps you collect around Hong Kong, pin each stop on
-            the map, and keep a photo memory of every stamp.
+            A personal profile for the free stamps you collect around Hong Kong,
+            with a wishlist for the next places to hunt down.
           </p>
           <div class="hero-actions">
             <button id="seed-button" class="button button-secondary" type="button">
-              Load Example Trail
+              Load Example Journal
             </button>
             <button id="export-button" class="button button-primary" type="button">
-              Export Trail
+              Backup Journal
             </button>
             <label class="button button-ghost" for="import-file">Import JSON</label>
             <input id="import-file" type="file" accept="application/json" hidden />
           </div>
+          <p id="save-status" class="save-status">Saved locally in this browser</p>
         </div>
         <div class="hero-panel">
-          <div class="panel-badge">Trail Snapshot</div>
+          <div class="panel-badge">Profile Snapshot</div>
           <div id="headline-stat" class="headline-stat">0 stamps collected</div>
           <p id="headline-note" class="panel-note">
-            Add your first stop and pin it on the Hong Kong map.
+            Add your first stamp photo to start the grid.
           </p>
         </div>
       </header>
@@ -52,7 +47,7 @@
         <section class="card card-form">
           <div class="section-title">
             <div>
-              <p class="section-kicker">New Stop</p>
+              <p class="section-kicker">Stamp Entry</p>
               <h2 id="form-title">Add A Stamp</h2>
             </div>
             <button id="reset-button" class="text-button" type="button">Clear Form</button>
@@ -60,8 +55,6 @@
 
           <form id="stamp-form" class="stamp-form">
             <input id="stamp-id" type="hidden" />
-            <input id="latitude" type="hidden" />
-            <input id="longitude" type="hidden" />
 
             <label>
               <span>Stamp Name</span>
@@ -101,22 +94,30 @@
 
             <div class="form-grid">
               <label>
-                <span>Date Collected</span>
-                <input id="collectedDate" name="collectedDate" type="date" required />
-              </label>
-              <label>
-                <span>Stamp Type</span>
-                <select id="stampType" name="stampType">
-                  <option>Shop stamp</option>
-                  <option>Museum stamp</option>
-                  <option>MTR / transport stamp</option>
-                  <option>Event stamp</option>
-                  <option>Temple stamp</option>
-                  <option>Tourist checkpoint</option>
-                  <option>Other</option>
+                <span>Status</span>
+                <select id="status" name="status">
+                  <option value="collected">Collected</option>
+                  <option value="wishlist">Wishlist</option>
                 </select>
               </label>
+              <label>
+                <span>Date</span>
+                <input id="collectedDate" name="collectedDate" type="date" />
+              </label>
             </div>
+
+            <label>
+              <span>Stamp Type</span>
+              <select id="stampType" name="stampType">
+                <option>Shop stamp</option>
+                <option>Museum stamp</option>
+                <option>MTR / transport stamp</option>
+                <option>Event stamp</option>
+                <option>Temple stamp</option>
+                <option>Tourist checkpoint</option>
+                <option>Other</option>
+              </select>
+            </label>
 
             <label>
               <span>Stamp Photo</span>
@@ -128,17 +129,8 @@
 
             <label>
               <span>Notes</span>
-              <textarea id="notes" name="notes" rows="4" placeholder="Opening hours, where the stamp is kept, ink colour, nearby stops..."></textarea>
+              <textarea id="notes" name="notes" rows="4" placeholder="Where the stamp is kept, ink colour, nearby stops, opening hours..."></textarea>
             </label>
-
-            <div class="map-field">
-              <div class="field-heading">
-                <span>Pick Place On Map</span>
-                <button id="locate-button" class="text-button" type="button">Use My Location</button>
-              </div>
-              <div id="picker-map" class="map picker-map"></div>
-              <p id="coordinate-label" class="coordinate-label">Click the map to drop a pin.</p>
-            </div>
 
             <div class="form-actions">
               <button class="button button-primary" type="submit">Save Stamp</button>
@@ -148,23 +140,33 @@
         </section>
 
         <section class="workspace">
-          <div class="stats-grid" id="stats-grid"></div>
+          <section class="profile-board">
+            <div class="profile-header">
+              <div class="profile-avatar">HA</div>
+              <div class="profile-copy">
+                <p class="section-kicker">Main Directory</p>
+                <h2>harbour_album.hk</h2>
+                <p id="profile-bio">Your Hong Kong stamp page is ready for the first post.</p>
+              </div>
+              <div class="stats-grid" id="stats-grid"></div>
+            </div>
+          </section>
 
-          <section class="card map-card">
+          <section class="card wishlist-card">
             <div class="section-title">
               <div>
-                <p class="section-kicker">Stamps Collected</p>
-                <h2>Hong Kong Map</h2>
+                <p class="section-kicker">Wishlist</p>
+                <h2>Next Stamp Stops</h2>
               </div>
             </div>
-            <div id="collection-map" class="map collection-map"></div>
+            <div id="wishlist-bar" class="wishlist-bar"></div>
           </section>
 
           <section class="card filters-card">
             <div class="section-title">
               <div>
-                <p class="section-kicker">Directory</p>
-                <h2>Find A Stop</h2>
+                <p class="section-kicker">Browse</p>
+                <h2>Stamp Grid</h2>
               </div>
             </div>
 
@@ -195,45 +197,23 @@
             </div>
           </section>
 
-          <section class="card collection-card">
-            <div class="section-title">
-              <div>
-                <p class="section-kicker">Collected Stops</p>
-                <h2>Your Stamp Trail</h2>
-              </div>
-            </div>
-            <div id="collection-list" class="collection-list"></div>
+          <section class="stamp-grid-section">
+            <div id="stamp-grid" class="stamp-grid"></div>
           </section>
         </section>
       </main>
     </div>
 
-    <template id="stamp-card-template">
-      <article class="stamp-card">
-        <div class="stamp-thumb"></div>
-        <div class="stamp-card-body">
-          <div class="stamp-card-top">
-            <div>
-              <p class="stamp-place"></p>
-              <h3 class="stamp-name"></h3>
-            </div>
-            <span class="stamp-type"></span>
-          </div>
-          <div class="stamp-meta"></div>
-          <p class="stamp-notes"></p>
-          <div class="stamp-footer">
-            <span class="stamp-date"></span>
-            <button class="button button-secondary stamp-edit" type="button">Edit</button>
-          </div>
-        </div>
-      </article>
+    <template id="stamp-tile-template">
+      <button class="stamp-tile" type="button">
+        <span class="tile-image"></span>
+        <span class="tile-overlay">
+          <strong class="tile-name"></strong>
+          <span class="tile-place"></span>
+        </span>
+      </button>
     </template>
 
-    <script
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-      crossorigin=""
-    ></script>
     <script src="./app.js"></script>
   </body>
 </html>

@@ -1,9 +1,5 @@
 const STORAGE_KEY = "harbour-stamp-trail-hk";
-const HK_CENTER = [22.3193, 114.1694];
-const HK_BOUNDS = [
-  [22.137, 113.826],
-  [22.57, 114.443],
-];
+const SAVED_AT_KEY = `${STORAGE_KEY}-saved-at`;
 
 const form = document.querySelector("#stamp-form");
 const formTitle = document.querySelector("#form-title");
@@ -12,15 +8,16 @@ const resetButton = document.querySelector("#reset-button");
 const seedButton = document.querySelector("#seed-button");
 const exportButton = document.querySelector("#export-button");
 const importFile = document.querySelector("#import-file");
-const locateButton = document.querySelector("#locate-button");
-const list = document.querySelector("#collection-list");
+const grid = document.querySelector("#stamp-grid");
+const wishlistBar = document.querySelector("#wishlist-bar");
 const statsGrid = document.querySelector("#stats-grid");
 const headlineStat = document.querySelector("#headline-stat");
 const headlineNote = document.querySelector("#headline-note");
-const template = document.querySelector("#stamp-card-template");
+const profileBio = document.querySelector("#profile-bio");
+const template = document.querySelector("#stamp-tile-template");
 const photoInput = document.querySelector("#photo");
 const photoPreview = document.querySelector("#photo-preview");
-const coordinateLabel = document.querySelector("#coordinate-label");
+const saveStatus = document.querySelector("#save-status");
 
 const filters = {
   search: document.querySelector("#search"),
@@ -28,54 +25,8 @@ const filters = {
   type: document.querySelector("#filter-type"),
 };
 
-let collection = loadCollection();
+let collection = loadCollection().map(normalizeStamp);
 let pendingPhoto = "";
-let pickerMap;
-let pickerMarker;
-let collectionMap;
-let markerLayer;
-
-const exampleCollection = [
-  {
-    id: crypto.randomUUID(),
-    name: "Former Central Police Station Stamp",
-    place: "Tai Kwun",
-    district: "Central and Western",
-    collectedDate: "2026-04-18",
-    stampType: "Museum stamp",
-    latitude: 22.2817,
-    longitude: 114.1546,
-    photo: "",
-    notes: "Stamp desk near the visitor centre. Good stop after PMQ.",
-    createdAt: Date.now(),
-  },
-  {
-    id: crypto.randomUUID(),
-    name: "Star Ferry Pier Memory Stamp",
-    place: "Tsim Sha Tsui Star Ferry Pier",
-    district: "Yau Tsim Mong",
-    collectedDate: "2026-04-26",
-    stampType: "Tourist checkpoint",
-    latitude: 22.2936,
-    longitude: 114.1688,
-    photo: "",
-    notes: "Small stamp table beside the harbour souvenir corner.",
-    createdAt: Date.now() + 1,
-  },
-  {
-    id: crypto.randomUUID(),
-    name: "HKMoA Gallery Stamp",
-    place: "Hong Kong Museum of Art",
-    district: "Yau Tsim Mong",
-    collectedDate: "2026-05-02",
-    stampType: "Museum stamp",
-    latitude: 22.2932,
-    longitude: 114.1722,
-    photo: "",
-    notes: "Clean red ink. Ask at the front desk.",
-    createdAt: Date.now() + 2,
-  },
-];
 
 const districtOptions = [
   "Central and Western",
@@ -98,6 +49,57 @@ const districtOptions = [
   "Kwai Tsing",
 ];
 
+const exampleCollection = [
+  {
+    id: crypto.randomUUID(),
+    name: "Former Central Police Station Stamp",
+    place: "Tai Kwun",
+    district: "Central and Western",
+    status: "collected",
+    collectedDate: "2026-04-18",
+    stampType: "Museum stamp",
+    photo: "",
+    notes: "Stamp desk near the visitor centre. Good stop after PMQ.",
+    createdAt: Date.now(),
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "Star Ferry Pier Memory Stamp",
+    place: "Tsim Sha Tsui Star Ferry Pier",
+    district: "Yau Tsim Mong",
+    status: "collected",
+    collectedDate: "2026-04-26",
+    stampType: "Tourist checkpoint",
+    photo: "",
+    notes: "Small stamp table beside the harbour souvenir corner.",
+    createdAt: Date.now() + 1,
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "HKMoA Gallery Stamp",
+    place: "Hong Kong Museum of Art",
+    district: "Yau Tsim Mong",
+    status: "collected",
+    collectedDate: "2026-05-02",
+    stampType: "Museum stamp",
+    photo: "",
+    notes: "Clean red ink. Ask at the front desk.",
+    createdAt: Date.now() + 2,
+  },
+  {
+    id: crypto.randomUUID(),
+    name: "Blue House Stamp",
+    place: "Blue House, Wan Chai",
+    district: "Wan Chai",
+    status: "wishlist",
+    collectedDate: "",
+    stampType: "Tourist checkpoint",
+    photo: "",
+    notes: "Check weekend opening hours before going.",
+    createdAt: Date.now() + 3,
+  },
+];
+
 function loadCollection() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -107,8 +109,25 @@ function loadCollection() {
   }
 }
 
+function normalizeStamp(stamp) {
+  return {
+    id: stamp.id || crypto.randomUUID(),
+    name: stamp.name || "",
+    place: stamp.place || "",
+    district: stamp.district || "",
+    status: stamp.status === "wishlist" || stamp.wanted ? "wishlist" : "collected",
+    collectedDate: stamp.collectedDate || "",
+    stampType: stamp.stampType || "Other",
+    photo: stamp.photo || "",
+    notes: stamp.notes || "",
+    createdAt: stamp.createdAt || Date.now(),
+  };
+}
+
 function saveCollection() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(collection));
+  localStorage.setItem(SAVED_AT_KEY, new Date().toISOString());
+  renderSaveStatus();
 }
 
 function getField(id) {
@@ -116,7 +135,7 @@ function getField(id) {
 }
 
 function formatDate(value) {
-  if (!value) return "No date";
+  if (!value) return "No date yet";
   return new Intl.DateTimeFormat("en-HK", {
     year: "numeric",
     month: "short",
@@ -124,49 +143,34 @@ function formatDate(value) {
   }).format(new Date(`${value}T12:00:00`));
 }
 
-function setCoordinates(latitude, longitude, shouldMoveMap = true) {
-  getField("latitude").value = latitude.toFixed(6);
-  getField("longitude").value = longitude.toFixed(6);
-  coordinateLabel.textContent = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+function formatSavedAt(value) {
+  if (!value) return "Saved locally in this browser";
 
-  if (!window.L || !pickerMap) return;
-
-  const position = [latitude, longitude];
-  if (!pickerMarker) {
-    pickerMarker = L.marker(position, { icon: createMarkerIcon("picker") }).addTo(pickerMap);
-  } else {
-    pickerMarker.setLatLng(position);
-  }
-
-  if (shouldMoveMap) {
-    pickerMap.setView(position, Math.max(pickerMap.getZoom(), 15));
-  }
+  return `Saved locally at ${new Intl.DateTimeFormat("en-HK", {
+    hour: "2-digit",
+    minute: "2-digit",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(value))}`;
 }
 
-function clearCoordinates() {
-  getField("latitude").value = "";
-  getField("longitude").value = "";
-  coordinateLabel.textContent = "Click the map to drop a pin.";
-  if (pickerMarker) {
-    pickerMarker.remove();
-    pickerMarker = null;
-  }
+function renderSaveStatus() {
+  saveStatus.textContent = formatSavedAt(localStorage.getItem(SAVED_AT_KEY));
 }
 
 function readForm() {
-  return {
+  return normalizeStamp({
     id: getField("stamp-id").value || crypto.randomUUID(),
     name: getField("name").value.trim(),
     place: getField("place").value.trim(),
     district: getField("district").value,
+    status: getField("status").value,
     collectedDate: getField("collectedDate").value,
     stampType: getField("stampType").value,
-    latitude: Number(getField("latitude").value),
-    longitude: Number(getField("longitude").value),
     photo: pendingPhoto,
     notes: getField("notes").value.trim(),
     createdAt: Date.now(),
-  };
+  });
 }
 
 function fillForm(stamp) {
@@ -174,17 +178,12 @@ function fillForm(stamp) {
   getField("name").value = stamp.name;
   getField("place").value = stamp.place;
   getField("district").value = stamp.district;
+  getField("status").value = stamp.status;
   getField("collectedDate").value = stamp.collectedDate;
   getField("stampType").value = stamp.stampType;
   getField("notes").value = stamp.notes || "";
   pendingPhoto = stamp.photo || "";
   renderPhotoPreview();
-
-  if (Number.isFinite(stamp.latitude) && Number.isFinite(stamp.longitude)) {
-    setCoordinates(stamp.latitude, stamp.longitude);
-  } else {
-    clearCoordinates();
-  }
 
   formTitle.textContent = "Edit Stamp";
   deleteButton.classList.remove("hidden");
@@ -194,9 +193,10 @@ function fillForm(stamp) {
 function resetForm() {
   form.reset();
   getField("stamp-id").value = "";
+  getField("status").value = "collected";
+  getField("stampType").value = "Shop stamp";
   getField("collectedDate").value = new Date().toISOString().slice(0, 10);
   pendingPhoto = "";
-  clearCoordinates();
   renderPhotoPreview();
   formTitle.textContent = "Add A Stamp";
   deleteButton.classList.add("hidden");
@@ -234,10 +234,11 @@ function currentFilters() {
   };
 }
 
-function filteredCollection() {
+function filteredCollected() {
   const active = currentFilters();
 
-  return [...collection]
+  return collection
+    .filter((stamp) => stamp.status === "collected")
     .filter((stamp) => {
       const searchBlob = [
         stamp.name,
@@ -255,27 +256,32 @@ function filteredCollection() {
 
       return matchesSearch && matchesDistrict && matchesType;
     })
-    .sort((a, b) => new Date(b.collectedDate) - new Date(a.collectedDate));
+    .sort((a, b) => new Date(b.collectedDate || 0) - new Date(a.collectedDate || 0));
 }
 
-function statCards(items) {
-  const districts = new Set(collection.map((stamp) => stamp.district).filter(Boolean));
-  const latest = collection
-    .filter((stamp) => stamp.collectedDate)
-    .sort((a, b) => new Date(b.collectedDate) - new Date(a.collectedDate))[0];
-
-  return [
-    { label: "Stamps Collected", value: collection.length },
-    { label: "Districts Visited", value: districts.size },
-    { label: "Showing Now", value: items.length },
-    { label: "Latest Stop", value: latest ? latest.place : "None yet" },
-  ];
+function wishlistItems() {
+  return collection
+    .filter((stamp) => stamp.status === "wishlist")
+    .sort((a, b) => b.createdAt - a.createdAt);
 }
 
 function renderStats(items) {
-  statsGrid.innerHTML = "";
+  const collected = collection.filter((stamp) => stamp.status === "collected");
+  const wishlist = wishlistItems();
+  const districts = new Set(collected.map((stamp) => stamp.district).filter(Boolean));
+  const latest = collected
+    .filter((stamp) => stamp.collectedDate)
+    .sort((a, b) => new Date(b.collectedDate) - new Date(a.collectedDate))[0];
 
-  statCards(items).forEach((card) => {
+  const cards = [
+    { label: "Posts", value: collected.length },
+    { label: "Districts", value: districts.size },
+    { label: "Wishlist", value: wishlist.length },
+    { label: "Showing", value: items.length },
+  ];
+
+  statsGrid.innerHTML = "";
+  cards.forEach((card) => {
     const article = document.createElement("article");
     article.className = "stat-card";
     article.innerHTML = `
@@ -285,20 +291,15 @@ function renderStats(items) {
     statsGrid.append(article);
   });
 
-  headlineStat.textContent = `${collection.length} stamp${collection.length === 1 ? "" : "s"} collected`;
-  if (collection.length === 0) {
-    headlineNote.textContent = "Add your first stop and pin it on the Hong Kong map.";
-  } else {
-    const districts = new Set(collection.map((stamp) => stamp.district)).size;
-    headlineNote.textContent = `${districts} district${districts === 1 ? "" : "s"} visited across your stamp trail.`;
-  }
-}
+  headlineStat.textContent = `${collected.length} stamp${collected.length === 1 ? "" : "s"} collected`;
+  headlineNote.textContent =
+    wishlist.length === 0
+      ? "Wishlist clear. Suspiciously powerful behaviour."
+      : `${wishlist.length} stamp${wishlist.length === 1 ? "" : "s"} waiting on the wishlist.`;
 
-function makeChip(text) {
-  const chip = document.createElement("span");
-  chip.className = "chip";
-  chip.textContent = text;
-  return chip;
+  profileBio.textContent = latest
+    ? `Latest stamp: ${latest.name} at ${latest.place}.`
+    : "Your Hong Kong stamp page is ready for the first post.";
 }
 
 function renderPhotoPreview() {
@@ -318,47 +319,80 @@ function renderPhotoPreview() {
   photoPreview.append(image);
 }
 
-function renderList(items) {
-  list.innerHTML = "";
+function renderWishlist() {
+  const items = wishlistItems();
+  wishlistBar.innerHTML = "";
+
+  if (items.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "wishlist-empty";
+    empty.textContent = "No wishlist stamps yet.";
+    wishlistBar.append(empty);
+    return;
+  }
+
+  items.forEach((stamp) => {
+    const item = document.createElement("article");
+    item.className = "wishlist-item";
+    item.innerHTML = `
+      <div>
+        <strong>${escapeHtml(stamp.name)}</strong>
+        <span>${escapeHtml(stamp.place)} / ${escapeHtml(stamp.district)}</span>
+      </div>
+      <div class="wishlist-actions">
+        <button class="text-button mark-collected" type="button">Collected</button>
+        <button class="text-button edit-wishlist" type="button">Edit</button>
+      </div>
+    `;
+
+    item.querySelector(".mark-collected").addEventListener("click", () => {
+      upsertStamp({
+        ...stamp,
+        status: "collected",
+        collectedDate: stamp.collectedDate || new Date().toISOString().slice(0, 10),
+      });
+    });
+    item.querySelector(".edit-wishlist").addEventListener("click", () => fillForm(stamp));
+    wishlistBar.append(item);
+  });
+}
+
+function renderGrid(items) {
+  grid.innerHTML = "";
 
   if (items.length === 0) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.innerHTML = `
-      <h3>No matching stops yet</h3>
-      <p>Clear the filters, or add the next stamp stop from your Hong Kong route.</p>
+      <h3>No collected stamps here yet</h3>
+      <p>Add a collected stamp, or loosen the filters to bring posts back into the grid.</p>
     `;
-    list.append(empty);
+    grid.append(empty);
     return;
   }
 
   items.forEach((stamp) => {
     const node = template.content.firstElementChild.cloneNode(true);
-    const thumb = node.querySelector(".stamp-thumb");
+    const imageSlot = node.querySelector(".tile-image");
 
     if (stamp.photo) {
       const image = document.createElement("img");
       image.src = stamp.photo;
       image.alt = `${stamp.name} stamp`;
-      thumb.append(image);
+      imageSlot.append(image);
     } else {
-      thumb.textContent = "Stamp";
-      thumb.classList.add("no-photo");
+      imageSlot.classList.add("no-photo");
+      imageSlot.textContent = stamp.name.slice(0, 2).toUpperCase();
     }
 
-    node.querySelector(".stamp-place").textContent = `${stamp.place} / ${stamp.district}`;
-    node.querySelector(".stamp-name").textContent = stamp.name;
-    node.querySelector(".stamp-type").textContent = stamp.stampType;
-
-    const meta = node.querySelector(".stamp-meta");
-    [stamp.district, stamp.stampType, hasCoordinates(stamp) && "Mapped"]
-      .filter(Boolean)
-      .forEach((value) => meta.append(makeChip(value)));
-
-    node.querySelector(".stamp-notes").textContent = stamp.notes || "No notes yet.";
-    node.querySelector(".stamp-date").textContent = formatDate(stamp.collectedDate);
-    node.querySelector(".stamp-edit").addEventListener("click", () => fillForm(stamp));
-    list.append(node);
+    node.querySelector(".tile-name").textContent = stamp.name;
+    node.querySelector(".tile-place").textContent = `${stamp.place} / ${formatDate(stamp.collectedDate)}`;
+    node.setAttribute(
+      "aria-label",
+      `Edit ${stamp.name}, collected at ${stamp.place}`
+    );
+    node.addEventListener("click", () => fillForm(stamp));
+    grid.append(node);
   });
 }
 
@@ -371,97 +405,12 @@ function initDistrictFilter() {
   });
 }
 
-function initMaps() {
-  if (!window.L) {
-    document.querySelectorAll(".map").forEach((map) => {
-      map.innerHTML = '<div class="map-unavailable">Map tiles could not load. Your saved stops still appear below.</div>';
-    });
-    return;
-  }
-
-  pickerMap = L.map("picker-map", {
-    maxBounds: HK_BOUNDS,
-    maxBoundsViscosity: 0.8,
-  }).setView(HK_CENTER, 11);
-
-  collectionMap = L.map("collection-map", {
-    maxBounds: HK_BOUNDS,
-    maxBoundsViscosity: 0.8,
-  }).setView(HK_CENTER, 11);
-
-  [pickerMap, collectionMap].forEach((map) => {
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
-  });
-
-  markerLayer = L.layerGroup().addTo(collectionMap);
-
-  pickerMap.on("click", (event) => {
-    setCoordinates(event.latlng.lat, event.latlng.lng, false);
-  });
-}
-
-function createMarkerIcon(kind = "default") {
-  const className = kind === "picker" ? "stamp-map-marker picker" : "stamp-map-marker";
-  return L.divIcon({
-    className,
-    html: '<span></span>',
-    iconSize: [28, 28],
-    iconAnchor: [14, 28],
-    popupAnchor: [0, -28],
-  });
-}
-
-function hasCoordinates(stamp) {
-  return Number.isFinite(stamp.latitude) && Number.isFinite(stamp.longitude);
-}
-
-function popupHtml(stamp) {
-  const photo = stamp.photo
-    ? `<img src="${stamp.photo}" alt="${escapeHtml(stamp.name)} stamp" />`
-    : '<div class="popup-photo-empty">No photo</div>';
-
-  return `
-    <div class="stamp-popup">
-      ${photo}
-      <strong>${escapeHtml(stamp.name)}</strong>
-      <span>${escapeHtml(stamp.place)}</span>
-      <small>${escapeHtml(formatDate(stamp.collectedDate))}</small>
-    </div>
-  `;
-}
-
-function renderCollectionMap(items) {
-  if (!window.L || !collectionMap || !markerLayer) return;
-
-  markerLayer.clearLayers();
-  const mapped = items.filter(hasCoordinates);
-
-  mapped.forEach((stamp) => {
-    L.marker([stamp.latitude, stamp.longitude], { icon: createMarkerIcon() })
-      .bindPopup(popupHtml(stamp), { maxWidth: 220 })
-      .addTo(markerLayer);
-  });
-
-  if (mapped.length > 1) {
-    collectionMap.fitBounds(
-      mapped.map((stamp) => [stamp.latitude, stamp.longitude]),
-      { padding: [36, 36], maxZoom: 15 }
-    );
-  } else if (mapped.length === 1) {
-    collectionMap.setView([mapped[0].latitude, mapped[0].longitude], 14);
-  } else {
-    collectionMap.setView(HK_CENTER, 11);
-  }
-}
-
 function render() {
-  const items = filteredCollection();
+  collection = collection.map(normalizeStamp);
+  const items = filteredCollected();
   renderStats(items);
-  renderList(items);
-  renderCollectionMap(items);
+  renderWishlist();
+  renderGrid(items);
 }
 
 function exportCollection() {
@@ -471,9 +420,10 @@ function exportCollection() {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "hong-kong-stamp-trail.json";
+  link.download = "hong-kong-stamp-journal.json";
   link.click();
   URL.revokeObjectURL(url);
+  saveStatus.textContent = "Backup downloaded. Local copy still saved here.";
 }
 
 function importCollection(file) {
@@ -481,16 +431,9 @@ function importCollection(file) {
   reader.onload = () => {
     try {
       const parsed = JSON.parse(reader.result);
-      if (!Array.isArray(parsed)) throw new Error("Invalid trail format.");
+      if (!Array.isArray(parsed)) throw new Error("Invalid journal format.");
 
-      collection = parsed.map((stamp) => ({
-        ...stamp,
-        id: stamp.id || crypto.randomUUID(),
-        createdAt: stamp.createdAt || Date.now(),
-        latitude: Number(stamp.latitude),
-        longitude: Number(stamp.longitude),
-        photo: stamp.photo || "",
-      }));
+      collection = parsed.map(normalizeStamp);
       saveCollection();
       resetForm();
       render();
@@ -502,7 +445,7 @@ function importCollection(file) {
 }
 
 function escapeHtml(value) {
-  return value
+  return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -514,11 +457,7 @@ form.addEventListener("submit", (event) => {
   event.preventDefault();
 
   const stamp = readForm();
-  if (!stamp.name || !stamp.place || !stamp.district || !stamp.collectedDate) return;
-  if (!hasCoordinates(stamp)) {
-    window.alert("Please click the map to choose where you collected this stamp.");
-    return;
-  }
+  if (!stamp.name || !stamp.place || !stamp.district) return;
 
   upsertStamp(stamp);
   resetForm();
@@ -545,19 +484,6 @@ seedButton.addEventListener("click", () => {
   render();
 });
 exportButton.addEventListener("click", exportCollection);
-locateButton.addEventListener("click", () => {
-  if (!navigator.geolocation) {
-    window.alert("Location is not available in this browser.");
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      setCoordinates(position.coords.latitude, position.coords.longitude);
-    },
-    () => window.alert("Could not get your current location.")
-  );
-});
 importFile.addEventListener("change", (event) => {
   const [file] = event.target.files || [];
   if (file) importCollection(file);
@@ -567,6 +493,7 @@ importFile.addEventListener("change", (event) => {
 Object.values(filters).forEach((element) => element.addEventListener("input", render));
 
 initDistrictFilter();
-initMaps();
+saveCollection();
 resetForm();
 render();
+renderSaveStatus();
